@@ -1,7 +1,10 @@
 use squarecl_macros::square;
 
+pub mod codegen;
+
 #[square]
-fn test_kernel(a: u32, b: u32, mut d: u32) {
+pub fn test_kernel(a: u32, b: u32) {
+    let mut d = 0;
     let a = a * b;
     let c = a + b;
     d = a / c + 2;

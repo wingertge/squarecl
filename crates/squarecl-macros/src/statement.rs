@@ -69,7 +69,7 @@ impl ToTokens for Statement {
                     quote![None]
                 };
 
-                quote_spanned! { span=>
+                quote_spanned! {span=>
                     #statement::Local {
                         variable: Box::new(#expr::expression_untyped(&#variable)),
                         mutable: #mutable,

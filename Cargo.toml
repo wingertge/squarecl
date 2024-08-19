@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "crates/squarecl-macros",
+    "crates/squarecl-wgpu",
+    "crates/squarecl-core",
+    "crates/squarecl-cuda",
+    "crates/squarecl-statements",
+]
+resolver = "2"

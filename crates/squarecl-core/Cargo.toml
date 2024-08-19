@@ -1,0 +1,7 @@
+[package]
+edition = "2021"
+name = "squarecl-core"
+version = "0.0.0"
+
+[dependencies]
+squarecl-macros = { path = "../squarecl-macros" }

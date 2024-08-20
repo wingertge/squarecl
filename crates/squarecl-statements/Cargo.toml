@@ -1,6 +1,9 @@
 [package]
+edition = "2021"
 name = "squarecl-statements"
 version = "0.0.0"
-edition = "2021"
 
 [dependencies]
+derive_more = { version = "1.0.0", features = ["deref"] }
+squarecl-core = { path = "../squarecl-core" }
+squarecl-macros = { path = "../squarecl-macros" }

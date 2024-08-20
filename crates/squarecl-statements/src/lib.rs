@@ -1,14 +1,13 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use squarecl_macros::square;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod codegen;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+const ALPHA: u32 = 10;
+
+#[square]
+pub fn test_kernel(a: u32, b: u32) {
+    let mut d: u32 = 0;
+    let a = a * b;
+    let c = a + b + ALPHA;
+    d = a / c + 2;
 }

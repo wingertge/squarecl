@@ -1,10 +1,10 @@
-use super::Expression;
+use super::{Expression, IRType};
 
 pub enum Statement {
     Local {
         variable: Box<Expression>,
         mutable: bool,
-        init: Option<Box<Expression>>,
+        ty: Option<IRType>,
     },
     Expression {
         expression: Box<Expression>,

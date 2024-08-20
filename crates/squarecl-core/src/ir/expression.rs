@@ -4,29 +4,53 @@ use std::{
     ops::{Add, Deref, Div, Mul, Neg, Not, Sub},
 };
 
-use super::operator::Operator;
+use super::{operator::Operator, IRType, SquareType};
 
 pub enum Expression {
     Binary {
         left: Box<Expression>,
         operator: Operator,
         right: Box<Expression>,
+        ty: IRType,
     },
     Unary {
         input: Box<Expression>,
         operator: Operator,
+        ty: IRType,
     },
     Variable {
         name: String,
+        ty: IRType,
     },
     Literal {
         // Stringified value for outputting directly to generated code
         value: String,
+        ty: IRType,
     },
     Assigment {
         left: Box<Expression>,
         right: Box<Expression>,
+        ty: IRType,
     },
+    /// Local variable initializer
+    Init {
+        left: Box<Expression>,
+        right: Box<Expression>,
+        ty: IRType,
+    },
+}
+
+impl Expression {
+    pub fn ir_type(&self) -> IRType {
+        match self {
+            Expression::Binary { ty, .. } => *ty,
+            Expression::Unary { ty, .. } => *ty,
+            Expression::Variable { ty, .. } => *ty,
+            Expression::Literal { ty, .. } => *ty,
+            Expression::Assigment { ty, .. } => *ty,
+            Expression::Init { ty, .. } => *ty,
+        }
+    }
 }
 
 pub trait Expr {
@@ -48,11 +72,11 @@ pub struct UnaryOp<TIn, TOut> {
 
 macro_rules! bin_op {
     ($name:ident, $trait:ident, $operator:path) => {
-        pub struct $name<TLeft, TRight, TOut>(pub BinaryOp<TLeft, TRight, TOut>)
+        pub struct $name<TLeft, TRight, TOut: SquareType>(pub BinaryOp<TLeft, TRight, TOut>)
         where
             TLeft: $trait<TRight, Output = TOut>;
 
-        impl<TLeft, TRight, TOut> Expr for $name<TLeft, TRight, TOut>
+        impl<TLeft, TRight, TOut: SquareType> Expr for $name<TLeft, TRight, TOut>
         where
             TLeft: $trait<TRight, Output = TOut>,
         {
@@ -63,6 +87,7 @@ macro_rules! bin_op {
                     left: Box::new(self.0.left.expression_untyped()),
                     right: Box::new(self.0.right.expression_untyped()),
                     operator: $operator,
+                    ty: <TOut as SquareType>::ir_type(),
                 }
             }
         }
@@ -73,13 +98,14 @@ macro_rules! unary_op {
     ($name:ident, $trait:ident, $operator:path, $target:ident) => {
         pub struct $name<TIn: $trait<$target = TOut>, TOut>(pub UnaryOp<TIn, TOut>);
 
-        impl<TIn: $trait<$target = TOut>, TOut> Expr for $name<TIn, TOut> {
+        impl<TIn: $trait<$target = TOut>, TOut: SquareType> Expr for $name<TIn, TOut> {
             type Output = TOut;
 
             fn expression_untyped(&self) -> Expression {
                 Expression::Unary {
                     input: Box::new(self.0.input.expression_untyped()),
                     operator: $operator,
+                    ty: <TOut as SquareType>::ir_type(),
                 }
             }
         }
@@ -95,47 +121,68 @@ unary_op!(NotExpr, Not, Operator::Not, Output);
 unary_op!(NegExpr, Neg, Operator::Neg, Output);
 unary_op!(DerefExpr, Deref, Operator::Deref, Target);
 
-pub struct Variable<T> {
+#[derive(Clone, Copy, Debug)]
+pub struct Variable<T: SquareType> {
     pub name: &'static str,
     pub _type: PhantomData<T>,
 }
 
-impl<T> Expr for Variable<T> {
+impl<T: SquareType> Expr for Variable<T> {
     type Output = T;
 
     fn expression_untyped(&self) -> Expression {
         Expression::Variable {
             name: self.name.to_string(),
+            ty: <T as SquareType>::ir_type(),
         }
     }
 }
 
-pub struct Literal<T: Display> {
+pub struct Literal<T: Display + SquareType> {
     pub value: T,
 }
 
-impl<T: Display> Expr for Literal<T> {
+impl<T: Display + SquareType> Expr for Literal<T> {
     type Output = T;
 
     fn expression_untyped(&self) -> Expression {
         Expression::Literal {
             value: self.value.to_string(),
+            ty: <T as SquareType>::ir_type(),
         }
     }
 }
 
-pub struct Assignment<TLeft, TRight> {
-    pub left: Box<dyn Expr<Output = TLeft>>,
-    pub right: Box<dyn Expr<Output = TRight>>,
+pub struct Assignment<T: SquareType> {
+    pub left: Box<dyn Expr<Output = T>>,
+    pub right: Box<dyn Expr<Output = T>>,
 }
 
-impl<TLeft, TRight> Expr for Assignment<TLeft, TRight> {
+impl<T: SquareType> Expr for Assignment<T> {
     type Output = ();
 
     fn expression_untyped(&self) -> Expression {
         Expression::Assigment {
             left: Box::new(self.left.expression_untyped()),
             right: Box::new(self.right.expression_untyped()),
+            ty: <T as SquareType>::ir_type(),
+        }
+    }
+}
+
+pub struct Initializer<T: SquareType> {
+    pub left: Box<dyn Expr<Output = T>>,
+    pub right: Box<dyn Expr<Output = T>>,
+}
+
+impl<T: SquareType> Expr for Initializer<T> {
+    type Output = T;
+
+    fn expression_untyped(&self) -> Expression {
+        Expression::Init {
+            left: Box::new(self.left.expression_untyped()),
+            right: Box::new(self.right.expression_untyped()),
+            ty: <T as SquareType>::ir_type(),
         }
     }
 }

@@ -15,6 +15,7 @@ use syn::{
 mod expression;
 mod kernel;
 mod operator;
+mod scope;
 mod statement;
 
 const IR_PREFIX: &'static str = "::squarecl_core::ir::";
@@ -27,6 +28,12 @@ const IR_PATH: LazyCell<Path> = LazyCell::new(|| {
 });
 
 pub(crate) fn prefix_ir(ident: Ident) -> Path {
+    let mut path = IR_PATH.clone();
+    path.segments.push(ident.into());
+    path
+}
+pub(crate) fn ir_type(ty: &str) -> Path {
+    let ident = format_ident!("{ty}");
     let mut path = IR_PATH.clone();
     path.segments.push(ident.into());
     path

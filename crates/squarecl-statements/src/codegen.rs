@@ -1,7 +1,10 @@
 use std::fmt::{Display, Error, Formatter};
 
 use derive_more::derive::Deref;
-use squarecl_core::ir::{Expression, IRType, Operator, Statement};
+use squarecl_core::{
+    ir::{Expression, IRType, Operator, Statement},
+    new_local_var,
+};
 
 pub struct WgpuKernel(pub Vec<Statement>);
 #[derive(Deref)]
@@ -37,30 +40,20 @@ impl Display for WgpuKernel {
 impl<'a> Display for WgpuStatement<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match &self.0 {
-            Statement::Local {
-                variable,
-                mutable,
-                ty,
-            } => {
-                let variable = e(variable);
-                let keyword = if *mutable { "var" } else { "let" };
-                match &**variable.0 {
-                    Expression::Init { left, right, .. } => {
-                        let ty = ty
-                            .map(WgpuType)
-                            .map(|ty| format!(": {ty}"))
-                            .unwrap_or("".to_string());
-                        let left = e(left);
-                        let right = e(right);
-                        writeln!(f, "{keyword} {left}{ty} = {right};")
-                    }
-                    _ => {
-                        // Prefer explicit type
-                        let ty = WgpuType(ty.unwrap_or(variable.ir_type()));
-                        writeln!(f, "{keyword} {variable}: {ty};") // TODO: Type
-                    }
+            Statement::Local { variable, .. } => match &**variable {
+                Expression::Variable { name, ty } => {
+                    let ty = WgpuType(*ty);
+                    writeln!(f, "var {name}: {ty};")
                 }
-            }
+                Expression::Init { left, right, ty } => {
+                    let variable = e(left);
+                    let ty = WgpuType(*ty);
+                    let init = e(right);
+                    writeln!(f, "var {variable}: {ty};")?;
+                    write!(f, "{init}")
+                }
+                _ => panic!("Local declaration must be init or variable"),
+            },
             Statement::Expression { expression } => {
                 let expression = e(expression);
                 writeln!(f, "{expression};")
@@ -82,27 +75,31 @@ impl<'a> Display for WgpuExpression<'a> {
                 right,
                 ..
             } => {
+                let out = new_local_var();
                 let left = e(left);
                 let operator = o(operator);
                 let right = e(right);
-                write!(f, "{left} {operator} {right}",)
+                writeln!(f, "{out} = {operator}({left}, {right});",)
             }
             Expression::Unary {
                 input, operator, ..
             } => {
+                let out = new_local_var();
                 let input = e(input);
                 let operator = o(operator);
-                write!(f, "{operator}{input}")
+                writeln!(f, "{out} = {operator}({input});")
             }
             Expression::Variable { name, .. } => write!(f, "{name}"),
             Expression::Literal { value, ty } => format_lit(f, value, ty), // TODO: Types
             Expression::Assigment { left, right, .. } => {
                 let left = e(left);
                 let right = e(right);
-                write!(f, "{left} = {right}")
+                writeln!(f, "{left} = {right};")
             }
-            Expression::Init { .. } => {
-                panic!("Init should be handled by `Statement::Local`");
+            Expression::Init { left, right, .. } => {
+                let left = e(left);
+                let right = e(right);
+                writeln!(f, "{left} = {right}")
             }
         }
     }
@@ -111,13 +108,13 @@ impl<'a> Display for WgpuExpression<'a> {
 impl<'a> Display for WgpuOperator<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            Operator::Add => write!(f, "+"),
-            Operator::Sub => write!(f, "-"),
-            Operator::Mul => write!(f, "*"),
-            Operator::Div => write!(f, "/"),
-            Operator::Deref => write!(f, "*"),
-            Operator::Not => write!(f, "!"),
-            Operator::Neg => write!(f, "-"),
+            Operator::Add => write!(f, "add"),
+            Operator::Sub => write!(f, "sub"),
+            Operator::Mul => write!(f, "mul"),
+            Operator::Div => write!(f, "div"),
+            Operator::Deref => write!(f, "deref"),
+            Operator::Not => write!(f, "not"),
+            Operator::Neg => write!(f, "neg"),
         }
     }
 }
